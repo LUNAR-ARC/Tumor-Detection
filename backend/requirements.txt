@@ -1,0 +1,14 @@
+# Deep Learning & Math
+torch>=2.0.0
+numpy>=1.24.0
+
+# Medical Imaging
+nibabel>=5.1.0
+
+# Training Utilities
+tensorboard>=2.13.0
+
+# Backend Web Server
+fastapi>=0.103.0
+uvicorn[standard]>=0.23.0
+python-multipart>=0.0.6

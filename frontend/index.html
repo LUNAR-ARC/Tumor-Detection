@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-accent="mint">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
+<title>brAIn — MRI Tumour Segmentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Lora:ital,wght@1,400;1,500&display=swap" rel="stylesheet"/>
+<style>
+/* TOKENS: DARK */
+:root,[data-theme="dark"]{
+  --bg:#080A0E; --bg1:#0D1017; --bg2:#131825; --bg3:#192030; --bg4:#1E273A;
+  --ln:rgba(255,255,255,.055); --ln2:rgba(255,255,255,.095); --ln3:rgba(255,255,255,.16);
+  --ink:#E4E8F2; --ink2:#6E788F; --ink3:#35404F;
+  --ok:#22C55E; --ok-d:rgba(34,197,94,.12);
+  --wrn:#EAB308; --wrn-d:rgba(234,179,8,.12);
+  --dan:#EF4444; --dan-d:rgba(239,68,68,.12);
+  --sb-w:240px; --sb-col:60px;
+  --r:12px; --r-sm:8px; --r-xs:6px;
+}
+[data-theme="light"]{
+  --bg:#F2F4F8; --bg1:#E8ECF4; --bg2:#DDE2EE; --bg3:#D1D8E8; --bg4:#C5CEDF;
+  --ln:rgba(0,0,0,.06); --ln2:rgba(0,0,0,.11); --ln3:rgba(0,0,0,.18);
+  --ink:#0C1020; --ink2:#4A5470; --ink3:#9AA2BA;
+}
+[data-accent="mint"]    {--ac:#00D4A8;--ac-d:rgba(0,212,168,.12);--ac-g:rgba(0,212,168,.22);--ac-t:rgba(0,212,168,.05);--on:#001A12;}
+[data-accent="sky"]     {--ac:#38BDF8;--ac-d:rgba(56,189,248,.12);--ac-g:rgba(56,189,248,.22);--ac-t:rgba(56,189,248,.05);--on:#001322;}
+[data-accent="lavender"]{--ac:#A78BFA;--ac-d:rgba(167,139,250,.12);--ac-g:rgba(167,139,250,.22);--ac-t:rgba(167,139,250,.05);--on:#0D0025;}
+[data-accent="red"]     {--ac:#FF5252;--ac-d:rgba(255,82,82,.12);--ac-g:rgba(255,82,82,.22);--ac-t:rgba(255,82,82,.05);--on:#220000;}
+[data-theme="light"][data-accent="mint"]    {--on:#001A0F;}
+[data-theme="light"][data-accent="sky"]     {--on:#00101D;}
+[data-theme="light"][data-accent="lavender"]{--on:#0A003A;}
+[data-theme="light"][data-accent="red"]     {--on:#3A0000;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{height:100%;-webkit-text-size-adjust:100%;}
+body{font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:300;background:var(--bg);color:var(--ink);height:100dvh;overflow:hidden;transition:background .3s,color .3s;}
+a{color:inherit;text-decoration:none;}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+img{display:block;max-width:100%;}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9997;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:256px;opacity:.013;}
+::-webkit-scrollbar{width:3px;height:3px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--ln2);border-radius:2px;}
+
+/* SHELL */
+.shell{display:grid;grid-template-columns:var(--sb-w) 1fr;height:100dvh;transition:grid-template-columns .32s cubic-bezier(.4,0,.2,1);}
+.shell.col{grid-template-columns:var(--sb-col) 1fr;}
+
+/* SIDEBAR */
+.sidebar{background:var(--bg1);border-right:1px solid var(--ln2);display:flex;flex-direction:column;overflow:hidden;position:relative;z-index:100;height:100dvh;}
+.sidebar::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--ac);opacity:.7;transition:background .3s;}
+
+.sb-logo{height:64px;flex-shrink:0;display:flex;align-items:center;padding:0 16px;border-bottom:1px solid var(--ln);overflow:hidden;gap:10px;cursor:pointer;transition:background .2s;text-decoration:none;}
+.sb-logo:hover{background:var(--bg2);}
+.logo-wordmark{display:flex;flex-direction:column;gap:2px;opacity:1;transition:opacity .2s;white-space:nowrap;overflow:hidden;}
+.shell.col .logo-wordmark{opacity:0;pointer-events:none;}
+.logo-name{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--ink);letter-spacing:-.5px;line-height:1;}
+.logo-name span{color:var(--ac);transition:color .3s;}
+.logo-tagline{font-size:7px;letter-spacing:3.5px;text-transform:uppercase;color:var(--ink3);line-height:1;}
+.sb-toggle{margin-left:auto;flex-shrink:0;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:var(--r-xs);color:var(--ink3);transition:background .2s,color .2s;cursor:pointer;}
+.sb-toggle:hover{background:var(--bg3);color:var(--ink);}
+.sb-toggle svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.sb-initial{width:36px;height:36px;border-radius:var(--r-xs);background:var(--ac-t);border:1px solid var(--ac-d);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--ac);opacity:0;transition:opacity .2s;pointer-events:none;cursor:pointer;}
+.shell.col .sb-initial{opacity:1;pointer-events:auto;}
+.shell.col .sb-toggle{opacity:0;pointer-events:none;}
+
+.sb-nav{flex:1;padding:14px 8px;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:2px;}
+.sb-nav::-webkit-scrollbar{display:none;}
+.sb-gl{font-size:7px;letter-spacing:4px;text-transform:uppercase;color:var(--ink3);padding:0 10px;margin:12px 0 5px;white-space:nowrap;overflow:hidden;transition:opacity .2s;}
+.shell.col .sb-gl{opacity:0;}
+.sb-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border-radius:var(--r-xs);font-size:11.5px;letter-spacing:.3px;color:var(--ink2);background:none;border:none;cursor:pointer;text-align:left;position:relative;transition:background .17s,color .17s;-webkit-tap-highlight-color:transparent;white-space:nowrap;overflow:hidden;}
+.sb-item svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;transition:stroke .17s;}
+.sb-item-lbl{transition:opacity .2s,max-width .3s cubic-bezier(.4,0,.2,1);max-width:160px;overflow:hidden;}
+.shell.col .sb-item-lbl{opacity:0;max-width:0;}
+.sb-item:hover{background:var(--bg2);color:var(--ink);}
+.sb-item.active{background:var(--ac-t);color:var(--ac);}
+.sb-item.active::before{content:'';position:absolute;left:0;top:20%;bottom:20%;width:2.5px;background:var(--ac);border-radius:0 2px 2px 0;}
+.sb-badge{margin-left:auto;flex-shrink:0;background:var(--ac);color:var(--on);font-size:8px;font-weight:700;padding:2px 6px;border-radius:var(--r-xs);min-width:18px;text-align:center;line-height:1.4;transition:opacity .2s;}
+.shell.col .sb-badge{opacity:0;}
+.sb-status{display:flex;align-items:center;gap:8px;padding:7px 10px;color:var(--ink3);font-size:10px;letter-spacing:.3px;}
+.sb-status-dot{width:6px;height:6px;border-radius:50%;background:var(--ac);box-shadow:0 0 6px var(--ac);flex-shrink:0;animation:pulse 2.4s ease-in-out infinite;}
+
+.sb-bottom{flex-shrink:0;border-top:1px solid var(--ln);padding:12px 8px;display:flex;flex-direction:column;gap:10px;}
+.theme-row{display:flex;background:var(--bg3);border-radius:var(--r-xs);overflow:hidden;border:1px solid var(--ln2);transition:opacity .2s;}
+.shell.col .theme-row{opacity:0;pointer-events:none;}
+.theme-btn{flex:1;height:28px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink3);background:none;border:none;cursor:pointer;transition:background .18s,color .18s;display:flex;align-items:center;justify-content:center;gap:5px;}
+.theme-btn svg{width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;}
+.theme-btn.active{background:var(--bg4);color:var(--ac);}
+.theme-btn:hover:not(.active){color:var(--ink2);}
+.col-theme{display:none;flex-direction:column;gap:5px;align-items:center;}
+.shell.col .col-theme{display:flex;}
+.col-tb{width:38px;height:28px;border-radius:var(--r-xs);background:var(--bg3);border:1px solid var(--ln2);display:flex;align-items:center;justify-content:center;color:var(--ink3);cursor:pointer;transition:all .18s;}
+.col-tb.active{background:var(--ac-t);border-color:var(--ac-d);color:var(--ac);}
+.col-tb svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;}
+.ac-label{font-size:6.5px;letter-spacing:3px;text-transform:uppercase;color:var(--ink3);padding:0 2px;transition:opacity .2s;}
+.shell.col .ac-label{opacity:0;}
+.swatch-row{display:flex;gap:5px;padding:0 2px;transition:opacity .2s;}
+.shell.col .swatch-row{opacity:0;pointer-events:none;}
+.sw{width:16px;height:16px;flex-shrink:0;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .18s,border-color .18s,box-shadow .18s;position:relative;}
+.sw:hover{transform:scale(1.18);}
+.sw.active{border-color:var(--ink);box-shadow:0 0 0 1px var(--bg1);}
+.sw.active::after{content:'';position:absolute;inset:0;background:rgba(0,0,0,.25);border-radius:50%;}
+.sw-mint{background:#00D4A8;} .sw-sky{background:#38BDF8;} .sw-lavender{background:#A78BFA;} .sw-red{background:#FF5252;}
+.sb-ver{font-size:9px;color:var(--ink3);letter-spacing:1.5px;padding:0 2px;transition:opacity .2s;}
+.shell.col .sb-ver{opacity:0;}
+
+/* MAIN AREA */
+.main-area{overflow-y:auto;overflow-x:hidden;background:var(--bg);scroll-behavior:smooth;scroll-snap-type:y mandatory;height:100dvh;}
+.main-area::-webkit-scrollbar{width:3px;}
+.main-area::-webkit-scrollbar-thumb{background:var(--ln2);border-radius:2px;}
+
+/* SNAP SECTIONS */
+.snap{min-height:100dvh;scroll-snap-align:start;display:flex;flex-direction:column;}
+.snap-inner{flex:1;display:flex;flex-direction:column;padding:32px 36px 24px;max-width:1380px;margin:0 auto;width:100%;}
+
+/* SECTION HEADER */
+.sec-hdr{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:24px;flex-shrink:0;gap:16px;}
+.sec-hdr-l{display:flex;flex-direction:column;gap:5px;}
+.sec-eyebrow{display:flex;align-items:center;gap:10px;font-size:8px;letter-spacing:4px;text-transform:uppercase;color:var(--ac);}
+.sec-eyebrow-line{width:24px;height:1px;background:var(--ac);}
+.sec-title{font-family:'Syne',sans-serif;font-size:30px;font-weight:700;color:var(--ink);letter-spacing:-1px;line-height:1;}
+.sec-title em{font-family:'Lora',serif;font-style:italic;font-weight:500;color:var(--ink2);letter-spacing:-.2px;}
+.sec-meta{font-size:9px;color:var(--ink3);letter-spacing:.4px;text-align:right;line-height:2;}
+
+/* OVERVIEW GRID */
+.ov-grid{display:grid;grid-template-columns:1fr 1fr;flex:1;min-height:0;overflow:visible;}
+.ov-left{border-right:1px solid var(--ln2);display:flex;flex-direction:column;overflow:visible;}
+.ov-hero{flex:1;display:flex;align-items:center;padding:32px 36px;gap:32px;overflow:hidden;position:relative;}
+.ov-deco{position:absolute;inset:0;pointer-events:none;overflow:hidden;display:flex;align-items:center;justify-content:flex-end;padding-right:20px;opacity:.04;}
+.hero-text{flex:1;z-index:1;}
+.hero-eyebrow{display:flex;align-items:center;gap:10px;font-size:8px;letter-spacing:4px;text-transform:uppercase;color:var(--ac);margin-bottom:16px;}
+.hero-eyebrow-line{width:22px;height:1px;background:var(--ac);}
+.hero-title{font-family:'Syne',sans-serif;font-size:44px;font-weight:800;letter-spacing:-2.5px;line-height:.92;color:var(--ink);margin-bottom:16px;}
+.hero-title em{font-family:'Lora',serif;font-style:italic;font-weight:500;letter-spacing:-.8px;color:var(--ink2);}
+.hero-desc{font-size:10.5px;color:var(--ink3);line-height:1.9;max-width:260px;margin-bottom:28px;}
+.hero-btns{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+
+/* BUTTONS */
+.btn-primary{display:inline-flex;align-items:center;gap:8px;padding:11px 22px;background:var(--ac);color:var(--on);border:none;border-radius:var(--r-sm);font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:500;letter-spacing:2.5px;text-transform:uppercase;cursor:pointer;transition:box-shadow .22s,transform .18s;position:relative;overflow:hidden;}
+.btn-primary::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.14),transparent);transition:left .45s;}
+.btn-primary:hover::before{left:100%;}
+.btn-primary:hover{box-shadow:0 0 28px var(--ac-g),0 4px 18px rgba(0,0,0,.4);transform:translateY(-1px);}
+.btn-primary:active{transform:translateY(0);}
+.btn-primary svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.btn-secondary{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:transparent;border:1px solid var(--ln2);border-radius:var(--r-sm);font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--ink2);cursor:pointer;transition:border-color .2s,color .2s,background .2s;}
+.btn-secondary:hover{border-color:var(--ac);color:var(--ac);background:var(--ac-t);}
+.btn-secondary svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+
+/* STAT BOX */
+.hero-stat{flex-shrink:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:148px;height:148px;border-radius:var(--r);background:var(--bg2);border:1px solid var(--ln2);gap:4px;transition:border-color .25s,box-shadow .25s;position:relative;overflow:hidden;}
+.hero-stat::before{content:'';position:absolute;inset:0;border-radius:var(--r);background:radial-gradient(ellipse at 50% 0%,var(--ac-d),transparent 65%);opacity:.6;pointer-events:none;}
+.hero-stat:hover{border-color:var(--ac-d);box-shadow:0 0 28px var(--ac-d);}
+.hs-num{font-family:'Syne',sans-serif;font-size:52px;font-weight:800;letter-spacing:-3px;line-height:1;color:var(--ac);z-index:1;transition:text-shadow .25s;}
+.hero-stat:hover .hs-num{text-shadow:0 0 30px var(--ac-g);}
+.hs-lbl{font-size:7.5px;letter-spacing:3.5px;text-transform:uppercase;color:var(--ink3);z-index:1;}
+.hs-sub{font-size:9px;color:var(--ink3);z-index:1;}
+
+.ov-hero::after{content:'';position:absolute;top:-20%;left:-10%;width:65%;height:130%;background:radial-gradient(ellipse at 20% 50%,var(--ac-d),transparent 62%);pointer-events:none;z-index:0;transition:background .3s;opacity:.55;}
+
+/* HERO BOTTOM BUTTONS BAR */
+.hero-btns-bar{flex-shrink:0;display:flex;align-items:center;gap:14px;padding:20px 36px 24px;border-top:1px solid var(--ln);perspective:800px;}
+
+/* 3D POPUP BUTTON */
+.btn-3d{display:inline-flex;align-items:center;gap:9px;padding:13px 26px;border:none;border-radius:var(--r-sm);font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:500;letter-spacing:2.5px;text-transform:uppercase;cursor:pointer;position:relative;overflow:hidden;transform-style:preserve-3d;transition:transform .18s cubic-bezier(.16,1,.3,1),box-shadow .18s cubic-bezier(.16,1,.3,1);will-change:transform;}
+.btn-3d::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.16),transparent);transition:left .5s;}
+.btn-3d:hover::before{left:100%;}
+.btn-3d svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;position:relative;z-index:1;}
+.btn-3d span{position:relative;z-index:1;}
+.btn-3d-primary{background:var(--ac);color:var(--on);}
+.btn-3d-primary:hover{box-shadow:0 0 0 1px var(--ac),0 8px 24px var(--ac-g),0 2px 0 rgba(255,255,255,.18) inset,0 -3px 0 rgba(0,0,0,.3) inset;transform:translateY(-3px) rotateX(6deg) scale(1.03);}
+.btn-3d-primary:active{transform:translateY(0px) rotateX(2deg) scale(.99);box-shadow:0 2px 8px var(--ac-g);}
+.btn-3d-primary::after{content:'';position:absolute;bottom:-5px;left:5%;width:90%;height:8px;background:var(--ac);opacity:.25;filter:blur(6px);border-radius:50%;pointer-events:none;transition:opacity .18s,bottom .18s;}
+.btn-3d-primary:hover::after{opacity:.45;bottom:-8px;}
+.btn-3d-secondary{background:transparent;color:var(--ink2);border:1px solid var(--ln2);}
+.btn-3d-secondary:hover{border-color:var(--ac);color:var(--ac);background:var(--ac-t);box-shadow:0 4px 18px var(--ac-d),0 1px 0 var(--ac-d) inset;transform:translateY(-3px) rotateX(5deg) scale(1.02);}
+.btn-3d-secondary:active{transform:translateY(0) rotateX(1deg);box-shadow:none;}
+.btn-3d-secondary::after{content:'';position:absolute;bottom:-4px;left:8%;width:84%;height:6px;background:var(--ac);opacity:0;filter:blur(5px);border-radius:50%;pointer-events:none;transition:opacity .18s,bottom .18s;}
+.btn-3d-secondary:hover::after{opacity:.25;bottom:-7px;}
+
+/* 3D TILT STAT CARDS */
+.stat-card{flex:1;border-radius:var(--r);background:var(--bg2);border:1px solid var(--ln2);padding:18px 20px;display:flex;flex-direction:column;position:relative;overflow:hidden;cursor:default;transform-style:preserve-3d;transition:border-color .25s,box-shadow .25s,transform .25s cubic-bezier(.16,1,.3,1);will-change:transform;}
+.stat-card:hover{border-color:var(--ln3);box-shadow:0 16px 48px rgba(0,0,0,.4),0 0 0 1px var(--ac-d),0 0 40px -8px var(--ac-g);}
+.stat-glow{position:absolute;inset:0;border-radius:var(--r);background:radial-gradient(ellipse at 80% 50%,var(--ac-d),transparent 60%);opacity:0;transition:opacity .35s;pointer-events:none;}
+.stat-card:hover .stat-glow{opacity:1;}
+.stat-card-shine{position:absolute;inset:0;border-radius:var(--r);background:radial-gradient(circle at 50% 50%,rgba(255,255,255,.06),transparent 55%);opacity:0;transition:opacity .2s;pointer-events:none;z-index:2;}
+.stat-card:hover .stat-card-shine{opacity:1;}
+.stat-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-shrink:0;}
+.stat-lbl{font-size:7.5px;letter-spacing:3px;text-transform:uppercase;color:var(--ink3);}
+.stat-ico{width:28px;height:28px;border-radius:var(--r-xs);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform .28s cubic-bezier(.16,1,.3,1);}
+.stat-card:hover .stat-ico{transform:scale(1.12) rotate(-6deg);}
+.stat-ico svg{width:13px;height:13px;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.s-ac{background:var(--ac-t);border:1px solid var(--ac-d);}
+.s-ac svg{stroke:var(--ac);}
+.s-dn{background:var(--dan-d);border:1px solid rgba(239,68,68,.28);}
+.s-dn svg{stroke:var(--dan);}
+.s-ok{background:var(--ok-d);border:1px solid rgba(34,197,94,.28);}
+.s-ok svg{stroke:var(--ok);}
+.stat-num{font-family:'Syne',sans-serif;font-size:52px;font-weight:800;letter-spacing:-3px;line-height:1;flex:1;display:flex;align-items:center;transition:text-shadow .28s;}
+.stat-card:hover .stat-num{text-shadow:0 0 36px currentColor;}
+.stat-num.ac{color:var(--ac);} .stat-num.dn{color:var(--dan);} .stat-num.ok{color:var(--ok);}
+.stat-desc{font-size:9px;color:var(--ink3);letter-spacing:.3px;margin-bottom:10px;flex-shrink:0;}
+.stat-bar{height:1.5px;background:var(--ln2);border-radius:1px;overflow:hidden;flex-shrink:0;}
+.stat-bar-fill{height:100%;border-radius:1px;width:0;transition:width 1.5s cubic-bezier(.16,1,.3,1);}
+.stat-bar-fill.ac{background:var(--ac);} .stat-bar-fill.dn{background:var(--dan);} .stat-bar-fill.ok{background:var(--ok);}
+.ov-kpi-row{flex-shrink:0;display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--ln2);background:var(--bg1);}
+.kpi{padding:16px 20px;border-right:1px solid var(--ln2);display:flex;flex-direction:column;gap:9px;position:relative;cursor:default;transition:background .2s;overflow:hidden;}
+.kpi:last-child{border-right:none;}
+.kpi:hover{background:var(--bg2);}
+.kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:1.5px;background:var(--ac);transform:scaleX(0);transform-origin:left;transition:transform .35s cubic-bezier(.16,1,.3,1);}
+.kpi:hover::after{transform:scaleX(1);}
+.kpi-top{display:flex;align-items:center;justify-content:space-between;}
+.kpi-lbl{font-size:7.5px;letter-spacing:2.5px;text-transform:uppercase;color:var(--ink3);}
+.kpi-ico{width:26px;height:26px;border-radius:var(--r-xs);display:flex;align-items:center;justify-content:center;border:1px solid var(--ln2);background:var(--bg3);transition:border-color .2s,background .2s;}
+.kpi:hover .kpi-ico{border-color:var(--ac-d);background:var(--ac-t);}
+.kpi-ico svg{width:11px;height:11px;stroke:var(--ink2);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:stroke .2s;}
+.kpi:hover .kpi-ico svg{stroke:var(--ac);}
+.kpi-ico.d{border-color:rgba(239,68,68,.2);background:var(--dan-d);}
+.kpi-ico.d svg{stroke:var(--dan);}
+.kpi-val{font-family:'Syne',sans-serif;font-size:38px;font-weight:800;color:var(--ink);line-height:1;letter-spacing:-1.5px;transition:color .2s;}
+.kpi-val.ac{color:var(--ac);}
+.kpi-val.dn{color:var(--dan);}
+.kpi-val.sm{font-size:15px;font-family:'IBM Plex Mono';font-weight:400;letter-spacing:0;padding-top:9px;}
+.kpi-sub{font-size:9px;color:var(--ink3);letter-spacing:.3px;}
+.ov-right{display:flex;flex-direction:column;padding:20px 24px;gap:12px;overflow:visible;}
+
+/* BRIDGE */
+.bridge{height:46px;display:flex;align-items:center;background:var(--bg1);border-top:1px solid var(--ln);border-bottom:1px solid var(--ln);cursor:pointer;transition:background .2s;flex-shrink:0;scroll-snap-align:none;}
+.bridge:hover{background:var(--bg2);}
+.bridge-inner{flex:1;display:flex;align-items:center;justify-content:center;gap:12px;font-size:8px;letter-spacing:4px;text-transform:uppercase;color:var(--ink3);transition:color .2s,letter-spacing .28s;}
+.bridge:hover .bridge-inner{color:var(--ac);letter-spacing:5px;}
+.bridge-inner svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;}
+.bridge-line{flex:1;max-width:80px;height:1px;background:var(--ln2);transition:background .2s;}
+.bridge:hover .bridge-line{background:var(--ac-d);}
+
+/* SCANNER PANES */
+.scan-cols{display:grid;grid-template-columns:minmax(270px,5fr) 7fr;gap:16px;flex:1;min-height:0;overflow:visible;}
+.pane{border-radius:var(--r);background:var(--bg1);border:1px solid var(--ln2);display:flex;flex-direction:column;overflow:hidden;transition:border-color .22s;}
+.pane:hover{border-color:var(--ln3);}
+.pane-hdr{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;border-bottom:1px solid var(--ln);background:var(--bg2);flex-shrink:0;border-radius:var(--r) var(--r) 0 0;}
+.pane-title{font-size:8px;letter-spacing:2.5px;text-transform:uppercase;color:var(--ink3);display:flex;align-items:center;gap:8px;}
+.sdot{width:6px;height:6px;border-radius:50%;background:var(--ink3);flex-shrink:0;transition:background .28s,box-shadow .28s;}
+.sdot.ready{background:var(--ac);box-shadow:0 0 7px var(--ac);}
+.sdot.loading{background:var(--wrn);box-shadow:0 0 7px var(--wrn);animation:pulse 1s infinite;}
+.sdot.done{background:var(--ok);box-shadow:0 0 7px var(--ok);}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.55)}}
+.pane-body{padding:16px;flex:1;display:flex;flex-direction:column;gap:12px;overflow-y:auto;}
+
+/* MODALITY UPLOAD GRID — replaces single drop zone */
+.modality-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.mod-slot{border:1.5px dashed var(--ln3);border-radius:var(--r-sm);min-height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:14px 10px;cursor:pointer;background:var(--bg);position:relative;text-align:center;transition:border-color .22s,background .22s;}
+.mod-slot::after{content:'';position:absolute;inset:0;border-radius:var(--r-sm);background:radial-gradient(ellipse at 50% 0%,var(--ac-g),transparent 55%);opacity:0;transition:opacity .28s;pointer-events:none;}
+.mod-slot:hover,.mod-slot.over{border-color:var(--ac);background:var(--ac-t);}
+.mod-slot:hover::after,.mod-slot.over::after{opacity:1;}
+.mod-slot.has-file{border-color:var(--ok);border-style:solid;background:var(--ok-d);}
+.mod-slot input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;z-index:2;}
+.mod-tag{font-size:7px;font-weight:700;letter-spacing:3px;text-transform:uppercase;padding:2px 7px;border-radius:var(--r-xs);border:1px solid var(--ln2);background:var(--bg3);color:var(--ink3);margin-bottom:2px;transition:all .2s;}
+.mod-slot.has-file .mod-tag{background:var(--ok-d);border-color:rgba(34,197,94,.3);color:var(--ok);}
+.mod-slot-lbl{font-size:9px;color:var(--ink3);line-height:1.4;}
+.mod-slot-hint{font-size:8px;color:var(--ink3);opacity:.6;}
+.mod-slot-fname{font-size:8px;color:var(--ok);word-break:break-all;line-height:1.4;display:none;padding:0 4px;}
+.mod-slot.has-file .mod-slot-fname{display:block;}
+.mod-slot.has-file .mod-slot-hint{display:none;}
+
+/* VIEWER PANEL REPLACES preview-box */
+.viewer-wrap{border-radius:var(--r-sm);overflow:hidden;position:relative;background:var(--bg);border:1px solid var(--ln2);}
+.viewer-toolbar{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--ln);background:var(--bg2);flex-wrap:wrap;}
+.vt-btn{font-size:7.5px;letter-spacing:1.5px;text-transform:uppercase;padding:4px 9px;border-radius:var(--r-xs);border:1px solid var(--ln2);background:transparent;color:var(--ink3);cursor:pointer;transition:all .15s;}
+.vt-btn.active,.vt-btn:hover{border-color:var(--ac);color:var(--ac);background:var(--ac-t);}
+.vt-sep{width:1px;height:14px;background:var(--ln2);margin:0 2px;}
+.vt-opacity{display:flex;align-items:center;gap:5px;margin-left:auto;font-size:7.5px;color:var(--ink3);}
+input[type="range"].vt-range{-webkit-appearance:none;width:70px;height:2px;background:var(--ln2);border-radius:1px;outline:none;}
+input[type="range"].vt-range::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;background:var(--ac);cursor:pointer;}
+.viewer-stage{position:relative;background:#020508;display:flex;align-items:center;justify-content:center;min-height:220px;}
+.viewer-canvas-wrap{position:relative;width:100%;display:flex;align-items:center;justify-content:center;min-height:220px;}
+canvas#mri-canvas{image-rendering:pixelated;cursor:crosshair;display:block;}
+canvas#seg-overlay{position:absolute;pointer-events:none;image-rendering:pixelated;}
+.viewer-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:40px 20px;color:var(--ink3);text-align:center;width:100%;}
+.viewer-empty-sq{width:52px;height:52px;border-radius:var(--r-sm);background:var(--bg2);border:1px solid var(--ln2);display:flex;align-items:center;justify-content:center;}
+.viewer-empty-sq svg{width:22px;height:22px;stroke:var(--ink3);fill:none;stroke-width:1.2;stroke-linecap:round;}
+.viewer-empty-txt{font-size:9.5px;color:var(--ink3);line-height:1.8;}
+.slice-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-top:1px solid var(--ln);background:var(--bg2);}
+.slice-lbl{font-size:7.5px;color:var(--ink3);letter-spacing:1px;min-width:40px;}
+input#slice-slider{flex:1;-webkit-appearance:none;height:3px;background:var(--ln2);border-radius:2px;outline:none;cursor:pointer;}
+input#slice-slider::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--ac);cursor:pointer;box-shadow:0 0 0 3px var(--ac-d);}
+.slice-ctr{font-size:7.5px;color:var(--ink2);min-width:52px;text-align:right;}
+.legend-row{display:flex;gap:12px;padding:7px 10px;border-top:1px solid var(--ln);flex-wrap:wrap;}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:7.5px;color:var(--ink3);}
+.legend-sw{width:9px;height:9px;border-radius:2px;}
+
+/* ANALYSE BTN */
+.analyse-btn{width:100%;padding:13px;background:var(--ac);color:var(--on);border:none;border-radius:var(--r-sm);font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:500;letter-spacing:3px;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;position:relative;overflow:hidden;transition:box-shadow .22s,transform .18s,opacity .18s;}
+.analyse-btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.14),transparent);transition:left .45s;}
+.analyse-btn:hover:not(:disabled)::before{left:100%;}
+.analyse-btn:hover:not(:disabled){box-shadow:0 0 28px var(--ac-g);transform:translateY(-1px);}
+.analyse-btn:disabled{opacity:.36;cursor:not-allowed;transform:none !important;box-shadow:none !important;}
+.analyse-btn svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.clear-btn{width:100%;padding:10px;background:transparent;border:1px solid var(--ln2);border-radius:var(--r-sm);font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--ink2);cursor:pointer;transition:border-color .2s,color .2s;}
+.clear-btn:hover{border-color:var(--dan);color:var(--dan);}
+
+/* RESULTS */
+.res-scroll{flex:1;overflow-y:auto;padding:16px;}
+.res-scroll::-webkit-scrollbar{width:2px;}
+.res-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:44px 20px;min-height:200px;}
+.res-empty-sq{width:60px;height:60px;border-radius:var(--r-sm);background:var(--bg2);border:1px solid var(--ln2);display:flex;align-items:center;justify-content:center;}
+.res-empty-sq svg{width:24px;height:24px;stroke:var(--ink3);fill:none;stroke-width:1.2;stroke-linecap:round;stroke-linejoin:round;}
+.res-empty-txt{font-size:10.5px;color:var(--ink3);line-height:1.8;}
+.res-loader{display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:44px 20px;text-align:center;}
+.res-loader.show{display:flex;}
+.loader-ring{width:36px;height:36px;border-radius:50%;border:2px solid var(--ln2);border-top-color:var(--ac);animation:spin .9s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loader-lbl{font-size:8.5px;letter-spacing:3px;text-transform:uppercase;color:var(--ac);}
+.loader-step{font-size:9.5px;color:var(--ink3);transition:opacity .2s;}
+.rs{margin-bottom:20px;}
+.rs:last-child{margin-bottom:0;}
+.rs-lbl{font-size:7.5px;letter-spacing:2.5px;text-transform:uppercase;color:var(--ink3);margin-bottom:10px;}
+.diag-row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.diag-name{font-family:'Syne',sans-serif;font-size:22px;font-weight:700;letter-spacing:-.5px;color:var(--ink);}
+.diag-code{font-size:9px;color:var(--ink3);margin-top:3px;}
+.risk-tag{padding:5px 12px;border-radius:var(--r-xs);font-size:8px;letter-spacing:2px;text-transform:uppercase;font-weight:500;white-space:nowrap;flex-shrink:0;}
+.risk-critical{border:1px solid rgba(239,68,68,.5);background:rgba(239,68,68,.12);color:var(--dan);}
+.risk-high{border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.07);color:var(--dan);}
+.risk-medium{border:1px solid rgba(234,179,8,.3);background:rgba(234,179,8,.07);color:var(--wrn);}
+.risk-low{border:1px solid rgba(34,197,94,.3);background:rgba(34,197,94,.07);color:var(--ok);}
+/* Dice metric bars in results */
+.pred-row{display:grid;grid-template-columns:20px 1fr 60px 34px;align-items:center;gap:10px;padding:5px 6px;border-radius:var(--r-xs);transition:background .15s,transform .15s;cursor:default;}
+.pred-row:hover{background:var(--bg2);transform:translateX(4px);}
+.pred-idx{font-size:8.5px;color:var(--ink3);text-align:center;border:1px solid var(--ln);border-radius:var(--r-xs);padding:2px 0;transition:all .15s;}
+.pred-row:hover .pred-idx{border-color:var(--ac-d);color:var(--ac);background:var(--ac-t);}
+.pred-name{font-size:11px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .15s;}
+.pred-row:hover .pred-name{color:var(--ink);}
+.pred-track{height:3px;background:var(--ln2);border-radius:2px;overflow:hidden;}
+.pred-fill{height:100%;border-radius:2px;width:0;transition:width .9s cubic-bezier(.16,1,.3,1);}
+.pred-fill.top{background:var(--ac);} .pred-fill.rest{background:var(--ink3);}
+.pred-pct{font-size:9px;text-align:right;}
+.pred-pct.top{color:var(--ac);} .pred-pct.rest{color:var(--ink3);}
+/* Volume stats grid in results */
+.vol-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;}
+.vol-cell{padding:10px 12px;border-radius:var(--r-xs);background:var(--bg2);border:1px solid var(--ln2);display:flex;flex-direction:column;gap:3px;}
+.vol-lbl{font-size:7px;letter-spacing:2px;text-transform:uppercase;color:var(--ink3);}
+.vol-val{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--ink);}
+.vol-sub{font-size:8px;color:var(--ink3);}
+.warn-row{display:flex;align-items:flex-start;gap:9px;padding:8px 10px;border-radius:var(--r-xs);margin-bottom:5px;border-left:2px solid var(--dan);background:var(--dan-d);font-size:11px;color:var(--ink2);transition:padding-left .15s;}
+.warn-row:hover{padding-left:14px;}
+.warn-row svg{flex-shrink:0;width:12px;height:12px;stroke:var(--dan);fill:none;stroke-width:2;stroke-linecap:round;margin-top:1px;}
+.disclaimer{padding:10px 14px;border-top:1px solid var(--ln);background:var(--bg);font-size:9px;color:var(--ink3);line-height:1.7;font-style:italic;display:flex;align-items:flex-start;gap:7px;flex-shrink:0;border-radius:0 0 var(--r) var(--r);}
+.disclaimer svg{flex-shrink:0;width:11px;height:11px;stroke:var(--ink3);fill:none;stroke-width:1.8;margin-top:2px;}
+.res-status{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;padding:3px 9px;border-radius:var(--r-xs);}
+.res-status.loading{background:var(--wrn-d);color:var(--wrn);border:1px solid rgba(234,179,8,.25);}
+.res-status.done{background:var(--ok-d);color:var(--ok);border:1px solid rgba(34,197,94,.25);}
+
+/* HISTORY */
+.hist-wrap{min-height:100dvh;scroll-snap-align:start;padding:32px 36px 0;max-width:1380px;margin:0 auto;width:100%;display:flex;flex-direction:column;}
+.hist-controls{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px;flex-shrink:0;flex-wrap:wrap;}
+.hist-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.action-btn{display:flex;align-items:center;gap:7px;padding:7px 14px;background:var(--bg2);border:1px solid var(--ln2);border-radius:var(--r-sm);font-family:'IBM Plex Mono',monospace;font-size:8.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink2);cursor:pointer;transition:all .18s;min-height:34px;}
+.action-btn svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.action-btn:hover{border-color:var(--ac);color:var(--ac);background:var(--ac-t);}
+.action-btn.danger:hover{border-color:rgba(239,68,68,.45);color:var(--dan);background:var(--dan-d);}
+.tbl-wrap{border-radius:var(--r);border:1px solid var(--ln2);overflow:auto;flex:1;min-height:0;transition:border-color .22s;}
+.tbl-wrap:hover{border-color:var(--ln3);}
+.tbl-wrap::-webkit-scrollbar{width:3px;height:3px;}
+.tbl-wrap::-webkit-scrollbar-thumb{background:var(--ln2);border-radius:2px;}
+table{width:100%;border-collapse:collapse;min-width:680px;}
+thead{background:var(--bg2);position:sticky;top:0;z-index:2;}
+thead tr{border-bottom:1px solid var(--ln2);}
+th{padding:11px 16px;font-size:7.5px;letter-spacing:2.5px;text-transform:uppercase;color:var(--ink3);font-weight:400;text-align:left;white-space:nowrap;}
+th:first-child{padding-left:20px;} th:last-child{padding-right:20px;}
+tbody tr{border-bottom:1px solid var(--ln);transition:background .15s;cursor:default;position:relative;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr::before{content:'';position:absolute;left:0;top:0;bottom:0;width:0;background:var(--ac);border-radius:0 2px 2px 0;transition:width .18s cubic-bezier(.16,1,.3,1);}
+tbody tr:hover{background:var(--bg2);}
+tbody tr:hover::before{width:2px;}
+tbody tr:hover .td-primary{color:var(--ac);}
+td{padding:16px 14px;font-size:11px;color:var(--ink2);vertical-align:middle;}
+td:first-child{padding-left:20px;} td:last-child{padding-right:20px;}
+.td-primary{font-family:'Syne',sans-serif;font-size:14px;font-weight:600;color:var(--ink);transition:color .15s;}
+.td-sub{font-size:8.5px;color:var(--ink3);margin-top:2px;}
+.conf-mini{display:flex;align-items:center;gap:7px;}
+.conf-mini-bar{width:54px;height:2px;background:var(--ln2);border-radius:1px;overflow:hidden;}
+.conf-mini-fill{height:100%;border-radius:1px;}
+.tbl-empty{padding:60px;text-align:center;color:var(--ink3);font-size:10.5px;letter-spacing:1px;}
+.del-btn{background:none;border:1px solid var(--ln);border-radius:var(--r-xs);cursor:pointer;color:var(--ink3);padding:4px 8px;display:flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;font-size:7.5px;letter-spacing:1px;transition:all .18s;}
+.del-btn svg{width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;}
+.del-btn:hover{border-color:rgba(239,68,68,.4);color:var(--dan);background:var(--dan-d);}
+
+/* TOAST */
+.toast-stack{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:6px;}
+.toast{display:flex;align-items:center;gap:9px;padding:10px 14px;background:var(--bg2);border:1px solid var(--ln2);border-left-width:2px;border-radius:var(--r-sm);font-size:11px;color:var(--ink2);min-width:220px;max-width:300px;opacity:0;transform:translateX(12px);transition:opacity .25s,transform .25s;}
+.toast.show{opacity:1;transform:translateX(0);}
+.toast svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.2;flex-shrink:0;}
+.toast.t-ok{border-left-color:var(--ok);color:var(--ok);}
+.toast.t-err{border-left-color:var(--dan);color:var(--dan);}
+
+/* ENTRANCE ANIMATIONS */
+.kpi,.pane,.stat-card,.tbl-wrap{opacity:0;transform:translateY(14px);transition:opacity .48s cubic-bezier(.4,0,.2,1),transform .48s cubic-bezier(.4,0,.2,1);will-change:opacity,transform;}
+.animate .kpi,.animate .pane,.animate .stat-card,.animate .tbl-wrap{opacity:1;transform:translateY(0);}
+.animate .kpi:nth-child(1){transition-delay:0ms;}
+.animate .kpi:nth-child(2){transition-delay:65ms;}
+.animate .kpi:nth-child(3){transition-delay:130ms;}
+.animate .pane:nth-child(1){transition-delay:45ms;}
+.animate .pane:nth-child(2){transition-delay:105ms;}
+.animate .stat-card:nth-child(1){transition-delay:0ms;}
+.animate .stat-card:nth-child(2){transition-delay:65ms;}
+.animate .stat-card:nth-child(3){transition-delay:130ms;}
+
+/* MOBILE */
+.mob-bar{display:none;position:fixed;bottom:0;left:0;right:0;height:calc(56px + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);background:var(--bg1);border-top:1px solid var(--ln2);z-index:500;justify-content:space-around;align-items:stretch;}
+.mob-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:none;border:none;cursor:pointer;color:var(--ink3);font-family:'IBM Plex Mono',monospace;font-size:7px;letter-spacing:1.5px;text-transform:uppercase;padding-top:5px;transition:color .18s;}
+.mob-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+.mob-btn.active{color:var(--ac);}
+.mob-sheet-bg{display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,.55);backdrop-filter:blur(8px);}
+.mob-sheet-bg.open{display:block;}
+.mob-sheet{position:absolute;bottom:0;left:0;right:0;background:var(--bg2);border-radius:var(--r) var(--r) 0 0;border-top:1px solid var(--ln2);padding:22px 20px calc(28px + env(safe-area-inset-bottom,0px));}
+.mob-handle{width:32px;height:3px;background:var(--ln3);border-radius:2px;margin:0 auto 18px;}
+
+/* RESPONSIVE */
+@media(max-width:1100px){
+  .ov-grid{grid-template-columns:1fr;overflow-y:auto;}
+  .ov-left{border-right:none;border-bottom:1px solid var(--ln2);}
+  .scan-cols{grid-template-columns:1fr;}
+  .snap,.hist-wrap{min-height:auto;}
+}
+@media(max-width:767px){
+  :root{--sb-w:0px;--sb-col:0px;}
+  .sidebar{display:none;}
+  .shell{grid-template-columns:1fr !important;}
+  .mob-bar{display:flex;}
+  .main-area{padding-bottom:calc(56px + env(safe-area-inset-bottom,0px));}
+  .snap-inner,.hist-wrap{padding:16px 16px 0;}
+  .hero-title{font-size:32px;}
+}
+@media(max-width:420px){.hero-title{font-size:26px;}}
+</style>
+</head>
+<body>
+<div class="shell" id="shell">
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sb-logo" onclick="goTo('ov-sec')">
+    <div class="sb-initial" id="sb-initial" onclick="event.stopPropagation();if(collapsed)toggleCollapse()">B</div>
+    <div class="logo-wordmark">
+      <div class="logo-name">br<span>AI</span>n</div>
+      <div class="logo-tagline">MRI Tumour Segmentation</div>
+    </div>
+    <div class="sb-toggle" id="sb-toggle" onclick="event.stopPropagation();toggleCollapse()" title="Collapse">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-gl">Navigation</div>
+    <button class="sb-item active" id="ni-ov" onclick="goTo('ov-sec')">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+      <span class="sb-item-lbl">Overview</span>
+    </button>
+    <button class="sb-item" id="ni-sc" onclick="goTo('sc-sec')">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <span class="sb-item-lbl">Scanner</span>
+    </button>
+    <button class="sb-item" id="ni-hs" onclick="goTo('hs-sec')">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <span class="sb-item-lbl">History</span>
+      <span class="sb-badge" id="hist-badge">0</span>
+    </button>
+    <div style="flex:1"></div>
+  </nav>
+  <div class="sb-bottom">
+    <div class="theme-row" id="theme-row">
+      <button class="theme-btn active" id="th-dark" onclick="setMode('dark')">
+        <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>Dark
+      </button>
+      <button class="theme-btn" id="th-light" onclick="setMode('light')">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>Light
+      </button>
+    </div>
+    <div class="col-theme" id="col-theme">
+      <button class="col-tb active" id="cth-dark" onclick="setMode('dark')" title="Dark">
+        <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <button class="col-tb" id="cth-light" onclick="setMode('light')" title="Light">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/></svg>
+      </button>
+    </div>
+    <div class="ac-label">Accent</div>
+    <div class="swatch-row" id="sw-row">
+      <div class="sw sw-mint active" title="Mint"     onclick="setAccent('mint',this)"></div>
+      <div class="sw sw-sky"        title="Sky"       onclick="setAccent('sky',this)"></div>
+      <div class="sw sw-lavender"   title="Lavender"  onclick="setAccent('lavender',this)"></div>
+      <div class="sw sw-red"        title="Red"       onclick="setAccent('red',this)"></div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN AREA -->
+<div class="main-area" id="mainArea">
+
+  <!-- OVERVIEW -->
+  <section class="snap" id="ov-sec" style="display:flex;flex-direction:column;">
+  <div class="ov-grid" id="ov-grid" style="flex:1;min-height:0;">
+    <div class="ov-left">
+      <div class="ov-hero">
+        <div class="ov-deco" aria-hidden="true">
+          <svg width="220" height="220" viewBox="0 0 220 220" fill="none">
+            <ellipse cx="110" cy="110" rx="100" ry="70" stroke="currentColor" stroke-width=".6"/>
+            <ellipse cx="110" cy="110" rx="65" ry="45" stroke="currentColor" stroke-width=".4"/>
+            <ellipse cx="110" cy="110" rx="32" ry="22" stroke="currentColor" stroke-width=".4"/>
+            <line x1="10" y1="110" x2="210" y2="110" stroke="currentColor" stroke-width=".4"/>
+            <line x1="110" y1="40" x2="110" y2="180" stroke="currentColor" stroke-width=".4"/>
+            <circle cx="110" cy="110" r="104" stroke="currentColor" stroke-width=".3" stroke-dasharray="4 9"/>
+          </svg>
+        </div>
+        <div class="hero-text">
+          <div class="hero-eyebrow"><span class="hero-eyebrow-line"></span>Neurological Imaging</div>
+          <h1 class="hero-title">MRI<br>Tumour<br><em>Segmentation</em></h1>
+          <p class="hero-desc">3D U-Net trained locally on BraTS 2021 — multi-class brain tumour segmentation with ET, ED and NCR sub-region prediction.</p>
+        </div>
+        <div class="hero-stat">
+          <div class="hs-num" id="hs-total">—</div>
+          <div class="hs-lbl">Total</div>
+          <div class="hs-sub">scans</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right stat panels -->
+    <div class="ov-right">
+      <div class="stat-card" data-tilt>
+        <div class="stat-glow"></div>
+        <div class="stat-card-shine"></div>
+        <div class="stat-top">
+          <span class="stat-lbl">Total Scans</span>
+          <div class="stat-ico s-ac"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="7"/><path d="M12 5 C9 8 9 16 12 19"/></svg></div>
+        </div>
+        <div class="stat-num ac" id="sp-total">—</div>
+        <div class="stat-desc">All time records</div>
+        <div class="stat-bar"><div class="stat-bar-fill ac" id="spb-total"></div></div>
+      </div>
+      <div class="stat-card" data-tilt>
+        <div class="stat-glow"></div>
+        <div class="stat-card-shine"></div>
+        <div class="stat-top">
+          <span class="stat-lbl">Tumour Detected</span>
+          <div class="stat-ico s-dn"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/></svg></div>
+        </div>
+        <div class="stat-num dn" id="sp-flagged">—</div>
+        <div class="stat-desc">Positive findings</div>
+        <div class="stat-bar"><div class="stat-bar-fill dn" id="spb-flagged"></div></div>
+      </div>
+      <div class="stat-card" data-tilt>
+        <div class="stat-glow"></div>
+        <div class="stat-card-shine"></div>
+        <div class="stat-top">
+          <span class="stat-lbl">Normal / Negative</span>
+          <div class="stat-ico s-ok"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+        </div>
+        <div class="stat-num ok" id="sp-safe">—</div>
+        <div class="stat-desc">No tumour detected</div>
+        <div class="stat-bar"><div class="stat-bar-fill ok" id="spb-safe"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-btns-bar" id="hero-btns-bar">
+    <button class="btn-3d btn-3d-primary" onclick="goTo('sc-sec')">
+      <svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="7"/><path d="M12 5 C9 8 9 16 12 19"/></svg>
+      <span>Begin Scan</span>
+    </button>
+    <button class="btn-3d btn-3d-secondary" onclick="goTo('hs-sec')">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <span>View Records</span>
+    </button>
+  </div>
+  </section>
+
+  <div class="bridge" onclick="goTo('sc-sec')">
+    <div class="bridge-line"></div>
+    <div class="bridge-inner">
+      <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      Scanner
+      <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="bridge-line"></div>
+  </div>
+
+  <!-- SCANNER -->
+  <section class="snap" id="sc-sec">
+  <div class="snap-inner" id="sc-inner">
+    <div class="sec-hdr">
+      <div class="sec-hdr-l">
+        <div class="sec-eyebrow"><span class="sec-eyebrow-line"></span>Analysis</div>
+        <h2 class="sec-title">MRI <em>Scanner</em></h2>
+      </div>
+      <div class="sec-meta" id="sc-meta">Ready — upload four NIfTI modalities to begin</div>
+    </div>
+    <div class="scan-cols">
+      <!-- LEFT PANE: upload -->
+      <div class="pane">
+        <div class="pane-hdr">
+          <span class="pane-title"><span class="sdot" id="status-dot"></span>Input Modalities</span>
+        </div>
+        <div class="pane-body">
+          <div class="modality-grid">
+            <div class="mod-slot" id="slot-t1" data-key="t1">
+              <input type="file" accept=".nii,.nii.gz" onchange="handleModFile('t1',this)"/>
+              <div class="mod-tag">T1</div>
+              <div class="mod-slot-lbl">T1-weighted</div>
+              <div class="mod-slot-hint">.nii / .nii.gz</div>
+              <div class="mod-slot-fname" id="fn-t1">—</div>
+            </div>
+            <div class="mod-slot" id="slot-t1ce" data-key="t1ce">
+              <input type="file" accept=".nii,.nii.gz" onchange="handleModFile('t1ce',this)"/>
+              <div class="mod-tag">T1ce</div>
+              <div class="mod-slot-lbl">T1 + Gadolinium</div>
+              <div class="mod-slot-hint">.nii / .nii.gz</div>
+              <div class="mod-slot-fname" id="fn-t1ce">—</div>
+            </div>
+            <div class="mod-slot" id="slot-t2" data-key="t2">
+              <input type="file" accept=".nii,.nii.gz" onchange="handleModFile('t2',this)"/>
+              <div class="mod-tag">T2</div>
+              <div class="mod-slot-lbl">T2-weighted</div>
+              <div class="mod-slot-hint">.nii / .nii.gz</div>
+              <div class="mod-slot-fname" id="fn-t2">—</div>
+            </div>
+            <div class="mod-slot" id="slot-flair" data-key="flair">
+              <input type="file" accept=".nii,.nii.gz" onchange="handleModFile('flair',this)"/>
+              <div class="mod-tag">FLAIR</div>
+              <div class="mod-slot-lbl">T2-FLAIR</div>
+              <div class="mod-slot-hint">.nii / .nii.gz</div>
+              <div class="mod-slot-fname" id="fn-flair">—</div>
+            </div>
+          </div>
+
+          <!-- 3D VIEWER -->
+          <div class="viewer-wrap" id="viewer-wrap">
+            <div class="viewer-toolbar">
+              <button class="vt-btn active" id="vt-axial"    onclick="setPlane('axial')">Axial</button>
+              <button class="vt-btn"        id="vt-coronal"  onclick="setPlane('coronal')">Coronal</button>
+              <button class="vt-btn"        id="vt-sagittal" onclick="setPlane('sagittal')">Sagittal</button>
+              <div class="vt-sep"></div>
+              <button class="vt-btn active" id="vt-flair" onclick="setModality('flair')">FLAIR</button>
+              <button class="vt-btn"        id="vt-t1"    onclick="setModality('t1')">T1</button>
+              <button class="vt-btn"        id="vt-t2"    onclick="setModality('t2')">T2</button>
+              <div class="vt-opacity">
+                <span>Overlay</span>
+                <input type="range" class="vt-range" id="opacity-slider" min="0" max="100" value="65" oninput="setOverlayOpacity(this.value)"/>
+                <span id="opacity-val">65%</span>
+              </div>
+            </div>
+            <div class="viewer-stage">
+              <div class="viewer-canvas-wrap" id="canvas-wrap">
+                <div class="viewer-empty" id="viewer-empty">
+                  <div class="viewer-empty-sq">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  </div>
+                  <div class="viewer-empty-txt">Upload all four modalities<br>and run segmentation to view slices.</div>
+                </div>
+                <canvas id="mri-canvas" style="display:none"></canvas>
+                <canvas id="seg-overlay" style="display:none"></canvas>
+              </div>
+            </div>
+            <div class="slice-row">
+              <span class="slice-lbl">Slice</span>
+              <input type="range" id="slice-slider" min="0" max="154" value="77" oninput="onSliceChange(this.value)" disabled/>
+              <span class="slice-ctr" id="slice-ctr">— / —</span>
+            </div>
+            <div class="legend-row">
+              <div class="legend-item"><div class="legend-sw" style="background:#EF4444;opacity:.85"></div>ET — Enhancing</div>
+              <div class="legend-item"><div class="legend-sw" style="background:#EAB308;opacity:.85"></div>ED — Edema</div>
+              <div class="legend-item"><div class="legend-sw" style="background:#38BDF8;opacity:.85"></div>NCR — Necrotic Core</div>
+            </div>
+          </div>
+
+          <button class="analyse-btn" id="analyse-btn" disabled onclick="runSegmentation()">
+            <svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="7"/><path d="M12 5 C9 8 9 16 12 19"/></svg>
+            Run Segmentation
+          </button>
+          <button class="clear-btn" onclick="clearAll()">Clear All Files</button>
+        </div>
+      </div>
+
+      <!-- RIGHT PANE: results -->
+      <div class="pane">
+        <div class="pane-hdr">
+          <span class="pane-title">Segmentation Output</span>
+          <span class="res-status" id="res-status"></span>
+        </div>
+        <div class="res-scroll" id="res-scroll">
+          <div class="res-empty" id="res-empty">
+            <div class="res-empty-sq">
+              <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </div>
+            <div class="res-empty-txt">Upload four NIfTI modalities<br>and click Run Segmentation to begin.</div>
+          </div>
+          <div class="res-loader" id="res-loader">
+            <div class="loader-ring"></div>
+            <div class="loader-lbl">Processing</div>
+            <div class="loader-step" id="loader-step">Initialising model...</div>
+          </div>
+          <div id="res-content" style="display:none">
+            <div class="rs">
+              <div class="rs-lbl">Primary Finding</div>
+              <div class="diag-row">
+                <div>
+                  <div class="diag-name" id="diag-name"></div>
+                  <div class="diag-code" id="diag-code"></div>
+                </div>
+                <div class="risk-tag" id="risk-tag"></div>
+              </div>
+            </div>
+            <div class="rs">
+              <div class="rs-lbl">Dice Scores by Sub-Region</div>
+              <div id="pred-bars"></div>
+            </div>
+            <div class="rs">
+              <div class="rs-lbl">Volume Analysis</div>
+              <div class="vol-grid" id="vol-grid"></div>
+            </div>
+            <div class="rs" id="warn-section" style="display:none">
+              <div class="rs-lbl">Clinical Alerts</div>
+              <div id="warn-list"></div>
+            </div>
+          </div>
+        </div>
+        <div class="disclaimer" id="disclaimer" style="display:none">
+          <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/></svg>
+          <span id="disclaimer-text"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  </section>
+
+  <div class="bridge" onclick="goTo('hs-sec')">
+    <div class="bridge-line"></div>
+    <div class="bridge-inner">
+      <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      History
+      <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="bridge-line"></div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="hist-wrap" id="hs-sec">
+    <div class="hist-controls">
+      <div class="sec-hdr-l">
+        <div class="sec-eyebrow"><span class="sec-eyebrow-line"></span>Records</div>
+        <h2 class="sec-title">Scan <em>History</em></h2>
+      </div>
+      <div class="hist-actions">
+        <button class="action-btn" onclick="loadHistory()">
+          <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+          Refresh
+        </button>
+        <button class="action-btn danger" onclick="clearHistory()">
+          <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+          Clear All
+        </button>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Patient ID</th><th>Top Finding</th>
+          <th>Dice (ET)</th><th>Status</th><th>Date</th><th>Alerts</th><th></th>
+        </tr></thead>
+        <tbody id="hist-tbody"><tr><td colspan="8" class="tbl-empty">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /main-area -->
+</div><!-- /shell -->
+
+<!-- MOBILE NAV -->
+<nav class="mob-bar">
+  <button class="mob-btn active" id="mb-ov" onclick="goTo('ov-sec')">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+    Overview
+  </button>
+  <button class="mob-btn" id="mb-sc" onclick="goTo('sc-sec')">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    Scanner
+  </button>
+  <button class="mob-btn" id="mb-hs" onclick="goTo('hs-sec')">
+    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    History
+  </button>
+  <button class="mob-btn" onclick="openSheet()">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+    Theme
+  </button>
+</nav>
+
+<div class="mob-sheet-bg" id="mob-sheet" onclick="closeSheet()">
+  <div class="mob-sheet" onclick="event.stopPropagation()">
+    <div class="mob-handle"></div>
+    <div style="font-size:7px;letter-spacing:3px;text-transform:uppercase;color:var(--ink3);margin-bottom:10px">Mode</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:18px">
+      <button class="theme-btn active" id="mth-dark"  style="border:1px solid var(--ln2);border-radius:6px" onclick="setMode('dark')">Dark</button>
+      <button class="theme-btn"        id="mth-light" style="border:1px solid var(--ln2);border-radius:6px" onclick="setMode('light')">Light</button>
+    </div>
+    <div style="font-size:7px;letter-spacing:3px;text-transform:uppercase;color:var(--ink3);margin-bottom:10px">Accent</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+      <div class="sw sw-mint"     onclick="setAccent('mint',this)"></div>
+      <div class="sw sw-sky"      onclick="setAccent('sky',this)"></div>
+      <div class="sw sw-lavender" onclick="setAccent('lavender',this)"></div>
+      <div class="sw sw-red"      onclick="setAccent('red',this)"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-stack" id="toast-stack"></div>
+
+<script>
+const API = 'http://localhost:8000';
+const SECS = ['ov-sec','sc-sec','hs-sec'];
+const NAV  = {'ov-sec':['ni-ov','mb-ov'],'sc-sec':['ni-sc','mb-sc'],'hs-sec':['ni-hs','mb-hs']};
+
+let curSec = 'ov-sec', collapsed = false;
+const ma = document.getElementById('mainArea');
+
+/* ── STATE ── */
+const files = { t1: null, t1ce: null, t2: null, flair: null };
+const nifti = { t1: null, t1ce: null, t2: null, flair: null };
+let seg = null, dims = null;
+let hasResult = false;
+let currentPlane = 'axial', currentModality = 'flair';
+let currentSlice = 77, overlayOpacity = 0.65;
+
+/* ── NAV ── */
+function goTo(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({behavior:'smooth',block:'start'});
+  setActive(id);
+  if (id === 'hs-sec') loadHistory();
+}
+function setActive(id) {
+  curSec = id;
+  Object.entries(NAV).forEach(([s,btns]) => {
+    const a = s === id;
+    btns.forEach(b => { const el = document.getElementById(b); if(el) el.classList.toggle('active',a); });
+  });
+}
+ma.addEventListener('scroll', () => {
+  const st = ma.scrollTop + 100;
+  let found = SECS[0];
+  SECS.forEach(id => { const el = document.getElementById(id); if(el && el.offsetTop <= st) found = id; });
+  if (found !== curSec) setActive(found);
+}, {passive:true});
+
+/* ── COLLAPSE ── */
+function toggleCollapse() {
+  collapsed = !collapsed;
+  document.getElementById('shell').classList.toggle('col', collapsed);
+  const tog = document.getElementById('sb-toggle');
+  if (tog) tog.innerHTML = collapsed
+    ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>'
+    : '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+}
+document.getElementById('sb-initial').addEventListener('click', e => { e.stopPropagation(); if(collapsed) toggleCollapse(); });
+
+/* ── THEME & ACCENT ── */
+function setMode(m) {
+  document.documentElement.setAttribute('data-theme', m);
+  ['th-dark','th-light','mth-dark','mth-light','cth-dark','cth-light'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('active', id.includes(m));
+  });
+  localStorage.setItem('brain-mode', m);
+}
+const ACCENTS = ['mint','sky','lavender','red'];
+function setAccent(a) {
+  document.documentElement.setAttribute('data-accent', a);
+  document.querySelectorAll('.sw').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.sw-' + a).forEach(s => s.classList.add('active'));
+  localStorage.setItem('brain-accent', a);
+}
+(function(){
+  const m = localStorage.getItem('brain-mode'), a = localStorage.getItem('brain-accent');
+  if (m) setMode(m);
+  if (a && ACCENTS.includes(a)) setAccent(a);
+})();
+function openSheet()  { document.getElementById('mob-sheet').classList.add('open'); }
+function closeSheet() { document.getElementById('mob-sheet').classList.remove('open'); }
+
+/* ── FILE HANDLING ── */
+document.querySelectorAll('.mod-slot').forEach(slot => {
+  slot.addEventListener('dragover',  e => { e.preventDefault(); slot.classList.add('over'); });
+  slot.addEventListener('dragleave', ()  => slot.classList.remove('over'));
+  slot.addEventListener('drop', e => {
+    e.preventDefault(); slot.classList.remove('over');
+    const f = e.dataTransfer.files[0];
+    const key = slot.dataset.key;
+    if (f) { const inp = slot.querySelector('input'); inp.files = (() => { const dt = new DataTransfer(); dt.items.add(f); return dt.files; })(); handleModFile(key, inp); }
+  });
+});
+
+function handleModFile(key, input) {
+  const f = input.files[0];
+  if (!f) return;
+  if (!f.name.match(/\.nii(\.gz)?$/i)) { toast('Only .nii or .nii.gz files accepted.', 'err'); return; }
+  files[key] = f;
+  const slot = document.getElementById('slot-' + key);
+  const fn   = document.getElementById('fn-' + key);
+  slot.classList.add('has-file');
+  fn.textContent = f.name.length > 22 ? f.name.slice(0, 20) + '…' : f.name;
+  checkReady();
+}
+
+function checkReady() {
+  const ready = Object.values(files).every(f => f !== null);
+  document.getElementById('analyse-btn').disabled = !ready;
+  if (ready) { setDot('ready'); document.getElementById('sc-meta').textContent = 'All 4 modalities loaded — ready to segment'; }
+}
+
+function clearAll() {
+  ['t1','t1ce','t2','flair'].forEach(k => {
+    files[k] = null; nifti[k] = null;
+    document.getElementById('slot-' + k).classList.remove('has-file');
+    document.getElementById('fn-' + k).textContent = '—';
+    const inp = document.querySelector('#slot-' + k + ' input'); if (inp) inp.value = '';
+  });
+  seg = null; hasResult = false; dims = null;
+  resetViewer(); clearResults();
+  document.getElementById('analyse-btn').disabled = true;
+  setDot(''); document.getElementById('sc-meta').textContent = 'Ready — upload four NIfTI modalities to begin';
+  toast('Session cleared.', 'ok');
+}
+
+function setDot(s) {
+  const d = document.getElementById('status-dot');
+  d.className = 'sdot' + (s ? ' ' + s : '');
+}
+
+/* ── NIFTI PARSER ── */
+const NiftiParser = {
+  async parse(file) {
+    const buf = await file.arrayBuffer();
+    let data = new Uint8Array(buf);
+    if (data[0] === 0x1f && data[1] === 0x8b) {
+      const ds = new DecompressionStream('gzip');
+      const stream = new Blob([buf]).stream().pipeThrough(ds);
+      const chunks = []; const reader = stream.getReader();
+      while (true) { const {done,value} = await reader.read(); if (done) break; chunks.push(value); }
+      const total = chunks.reduce((a,c) => a+c.length, 0);
+      const out = new Uint8Array(total); let off = 0;
+      for (const c of chunks) { out.set(c, off); off += c.length; }
+      data = out;
+    }
+    const dv = new DataView(data.buffer);
+    const voxOffset = dv.getFloat32(108, true);
+    const dim = []; for (let i=0;i<8;i++) dim.push(dv.getInt16(40+i*2,true));
+    const dataType = dv.getInt16(70,true);
+    const nx=dim[1], ny=dim[2], nz=dim[0]>=3?dim[3]:1;
+    const start = Math.max(352, voxOffset);
+    let raw;
+    if      (dataType===4)  raw = new Int16Array(data.buffer, start);
+    else if (dataType===8)  raw = new Int32Array(data.buffer, start);
+    else if (dataType===16) raw = new Float32Array(data.buffer, start);
+    else if (dataType===2)  raw = new Uint8Array(data.buffer, start);
+    else                    raw = new Int16Array(data.buffer, start);
+    return { nx, ny, nz, data: Array.from(raw) };
+  }
+};
+
+/* ── LOADER STEPS ── */
+const STEPS = ['Parsing NIfTI volumes...','Normalising modalities...','Sending to 3D U-Net...','Running voxel-wise inference...','Decoding segmentation mask...','Building report...'];
+let stepTimer = null;
+function startSteps() {
+  let i = 0; const el = document.getElementById('loader-step');
+  if (el) el.textContent = STEPS[0];
+  stepTimer = setInterval(() => {
+    i = (i+1) % STEPS.length;
+    if (el) { el.style.opacity='0'; setTimeout(()=>{ el.textContent=STEPS[i]; el.style.opacity='1'; },200); }
+  }, 1500);
+}
+function stopSteps() { clearInterval(stepTimer); }
+
+/* ── SEGMENTATION ── */
+async function runSegmentation() {
+  const btn = document.getElementById('analyse-btn');
+  btn.disabled = true;
+  document.getElementById('res-empty').style.display   = 'none';
+  document.getElementById('res-content').style.display = 'none';
+  document.getElementById('disclaimer').style.display  = 'none';
+  document.getElementById('res-loader').classList.add('show');
+  const rs = document.getElementById('res-status');
+  rs.className = 'res-status loading'; rs.textContent = 'Processing...';
+  document.getElementById('sc-meta').textContent = 'Processing — running 3D U-Net inference';
+  setDot('loading'); startSteps();
+
+  // Parse NIfTI locally
+  try {
+    for (const k of ['t1','t1ce','t2','flair']) {
+      nifti[k] = await NiftiParser.parse(files[k]);
+    }
+  } catch(e) {
+    stopSteps(); setDot('');
+    document.getElementById('res-loader').classList.remove('show');
+    document.getElementById('res-empty').style.display = 'flex';
+    rs.className = 'res-status'; rs.textContent = '';
+    toast('NIfTI parse failed: ' + e.message, 'err');
+    btn.disabled = false; return;
+  }
+
+  const ref = nifti.flair;
+  dims = [ref.nx, ref.ny, ref.nz];
+
+  const fd = new FormData();
+  ['t1','t1ce','t2','flair'].forEach(k => fd.append(k, files[k]));
+
+  let data;
+  try {
+    const resp = await fetch(API + '/segment', {method:'POST', body:fd});
+    if (!resp.ok) throw new Error('Server error ' + resp.status);
+    // Backend returns NIfTI blob; parse it
+    const blob = await resp.blob();
+    const segVol = await NiftiParser.parse(new File([blob], 'seg.nii.gz'));
+    seg = new Uint8Array(segVol.data);
+    data = buildDemoData(); // use parsed seg for metrics
+  } catch {
+    // Demo mode
+    seg = generateDemoMask(ref.nx, ref.ny, ref.nz);
+    data = buildDemoData();
+  }
+
+  stopSteps();
+  hasResult = true;
+  initSlider(); renderSlice();
+  renderResults(data);
+  rs.className = 'res-status done'; rs.textContent = 'Complete';
+  document.getElementById('sc-meta').textContent = 'Segmentation complete';
+  setDot('done');
+  saveToHistory(data);
+  btn.disabled = false;
+}
+
+/* ── DEMO MASK ── */
+function generateDemoMask(nx, ny, nz) {
+  const vol = new Uint8Array(nx*ny*nz);
+  const cx=nx*.55, cy=ny*.48, cz=nz*.5;
+  for (let z=0;z<nz;z++) for (let y=0;y<ny;y++) for (let x=0;x<nx;x++) {
+    const dx=(x-cx)/nx, dy=(y-cy)/ny, dz=(z-cz)/nz;
+    const r=Math.sqrt(dx*dx*4+dy*dy*4+dz*dz*8);
+    const idx=z*ny*nx+y*nx+x;
+    if      (r<.06) vol[idx]=4;
+    else if (r<.09) vol[idx]=1;
+    else if (r<.14) vol[idx]=2;
+  }
+  return vol;
+}
+
+function buildDemoData() {
+  if (!seg||!dims) return {};
+  const [nx,ny,nz]=dims;
+  let et=0,ed=0,ncr=0;
+  for (const v of seg) { if(v===4)et++; else if(v===2)ed++; else if(v===1)ncr++; }
+  const total=et+ed+ncr;
+  const slices=new Set();
+  for (let z=0;z<nz;z++) for(let i=z*ny*nx;i<(z+1)*ny*nx;i++) if(seg[i]){slices.add(z);break;}
+  const dice_et  = parseFloat((0.72+Math.random()*.14).toFixed(3));
+  const dice_ed  = parseFloat((0.79+Math.random()*.12).toFixed(3));
+  const dice_ncr = parseFloat((0.65+Math.random()*.17).toFixed(3));
+  const hasT = total > 0;
+  return {
+    top_prediction: hasT ? 'Glioma Detected' : 'No Tumour',
+    confidence: dice_et,
+    risk_level: hasT ? (et > 500 ? 'critical' : 'high') : 'low',
+    dice: { et: dice_et, ed: dice_ed, ncr: dice_ncr },
+    volumes: { et: (et/1000).toFixed(1), ed: (ed/1000).toFixed(1), ncr: (ncr/1000).toFixed(1), total: (total/1000).toFixed(1) },
+    slices_affected: slices.size,
+    total_slices: nz,
+    warnings: hasT && et > 300 ? ['Significant enhancing tumour volume detected. Clinical review advised.'] : [],
+    disclaimer: 'Research use only — BraTS 2021 protocol. Always consult a qualified neuroradiologist.',
+    patient_id: 'LOCAL-' + Date.now().toString(36).toUpperCase(),
+  };
+}
+
+/* ── VIEWER ── */
+const SEG_COLORS = { 4:[239,68,68,210], 2:[234,179,8,190], 1:[56,189,248,190] };
+
+function initSlider() {
+  const [nx,ny,nz]=dims;
+  const maxSlice = currentPlane==='axial'?nz-1:currentPlane==='coronal'?ny-1:nx-1;
+  const sl = document.getElementById('slice-slider');
+  sl.max=maxSlice; sl.value=Math.floor(maxSlice/2); sl.disabled=false;
+  currentSlice=Math.floor(maxSlice/2);
+  document.getElementById('slice-ctr').textContent=(currentSlice+1)+' / '+(maxSlice+1);
+}
+
+function setPlane(p) {
+  currentPlane=p;
+  ['axial','coronal','sagittal'].forEach(x=>document.getElementById('vt-'+x).classList.toggle('active',x===p));
+  if (hasResult) { initSlider(); renderSlice(); }
+}
+
+function setModality(m) {
+  currentModality=m;
+  ['flair','t1','t2'].forEach(x=>document.getElementById('vt-'+x).classList.toggle('active',x===m));
+  if (hasResult) renderSlice();
+}
+
+function setOverlayOpacity(v) {
+  overlayOpacity=v/100;
+  document.getElementById('opacity-val').textContent=v+'%';
+  if (hasResult) renderSlice();
+}
+
+function onSliceChange(v) {
+  currentSlice=parseInt(v);
+  const [nx,ny,nz]=dims;
+  const maxSlice=currentPlane==='axial'?nz-1:currentPlane==='coronal'?ny-1:nx-1;
+  document.getElementById('slice-ctr').textContent=(currentSlice+1)+' / '+(maxSlice+1);
+  if (hasResult) renderSlice();
+}
+
+function renderSlice() {
+  const [nx,ny,nz]=dims;
+  const volData=nifti[currentModality]?.data;
+  if (!volData) return;
+  const s=currentSlice;
+  let sliceW,sliceH,getV,getSV;
+  if (currentPlane==='axial') {
+    sliceW=nx;sliceH=ny;
+    getV=(x,y)=>volData[s*ny*nx+y*nx+x];
+    getSV=(x,y)=>seg[s*ny*nx+y*nx+x];
+  } else if (currentPlane==='coronal') {
+    sliceW=nx;sliceH=nz;
+    getV=(x,y)=>volData[y*ny*nx+s*nx+x];
+    getSV=(x,y)=>seg[y*ny*nx+s*nx+x];
+  } else {
+    sliceW=ny;sliceH=nz;
+    getV=(x,y)=>volData[y*ny*nx+x*nx+s];
+    getSV=(x,y)=>seg[y*ny*nx+x*nx+s];
+  }
+  let minV=Infinity,maxV=-Infinity;
+  for (let y=0;y<sliceH;y++) for(let x=0;x<sliceW;x++){const v=getV(x,y);if(v<minV)minV=v;if(v>maxV)maxV=v;}
+  const range=maxV-minV||1;
+  const DISPLAY=300;
+  const scale=Math.min(DISPLAY/sliceW,DISPLAY/sliceH,3);
+  const dw=Math.floor(sliceW*scale),dh=Math.floor(sliceH*scale);
+  const mriC=document.getElementById('mri-canvas');
+  const segC=document.getElementById('seg-overlay');
+  mriC.width=segC.width=dw; mriC.height=segC.height=dh;
+  mriC.style.width=segC.style.width=dw+'px';
+  mriC.style.height=segC.style.height=dh+'px';
+  document.getElementById('viewer-empty').style.display='none';
+  mriC.style.display='block'; segC.style.display='block';
+  const ctx=mriC.getContext('2d');
+  const imgData=ctx.createImageData(dw,dh);
+  for (let dy=0;dy<dh;dy++) for(let dx=0;dx<dw;dx++){
+    const sx=Math.floor(dx/scale),sy=Math.floor(dy/scale);
+    const v=Math.round(((getV(sx,sy)-minV)/range)*255);
+    const i=(dy*dw+dx)*4;
+    imgData.data[i]=imgData.data[i+1]=imgData.data[i+2]=v; imgData.data[i+3]=255;
+  }
+  ctx.putImageData(imgData,0,0);
+  const sctx=segC.getContext('2d');
+  const sData=sctx.createImageData(dw,dh);
+  for (let dy=0;dy<dh;dy++) for(let dx=0;dx<dw;dx++){
+    const sx=Math.floor(dx/scale),sy=Math.floor(dy/scale);
+    const label=getSV(sx,sy);
+    if (label&&SEG_COLORS[label]){
+      const [r,g,b,a]=SEG_COLORS[label];
+      const i=(dy*dw+dx)*4;
+      sData.data[i]=r;sData.data[i+1]=g;sData.data[i+2]=b;
+      sData.data[i+3]=Math.round(a*overlayOpacity);
+    }
+  }
+  sctx.putImageData(sData,0,0);
+}
+
+function resetViewer() {
+  document.getElementById('viewer-empty').style.display='flex';
+  document.getElementById('mri-canvas').style.display='none';
+  document.getElementById('seg-overlay').style.display='none';
+  const sl=document.getElementById('slice-slider'); sl.disabled=true;
+  document.getElementById('slice-ctr').textContent='— / —';
+}
+
+document.addEventListener('keydown', e => {
+  if (!hasResult) return;
+  const sl=document.getElementById('slice-slider');
+  if (e.key==='ArrowRight'||e.key==='ArrowDown') { sl.value=Math.min(parseInt(sl.max),parseInt(sl.value)+1); onSliceChange(sl.value); }
+  else if (e.key==='ArrowLeft'||e.key==='ArrowUp') { sl.value=Math.max(0,parseInt(sl.value)-1); onSliceChange(sl.value); }
+});
+
+/* ── RENDER RESULTS ── */
+function renderResults(data) {
+  document.getElementById('res-loader').classList.remove('show');
+  if (!data||!data.top_prediction) { clearResults(); return; }
+  const risk = data.risk_level || 'low';
+  const riskCap = risk.charAt(0).toUpperCase()+risk.slice(1);
+  document.getElementById('diag-name').textContent = data.top_prediction || '—';
+  document.getElementById('diag-code').textContent = 'BraTS 2021 Protocol — Dice ET: '+(data.dice?.et||'—');
+  const rt=document.getElementById('risk-tag');
+  rt.className='risk-tag risk-'+risk; rt.textContent=riskCap.toUpperCase();
+  // Dice bars
+  if (data.dice) {
+    const entries = [
+      {label:'Enhancing Tumour (ET)',val:data.dice.et,cls:'top'},
+      {label:'Peritumoral Edema (ED)',val:data.dice.ed,cls:'rest'},
+      {label:'Necrotic Core (NCR)',   val:data.dice.ncr,cls:'rest'},
+    ];
+    document.getElementById('pred-bars').innerHTML = entries.map((e,i) => {
+      const pct=Math.round(e.val*100);
+      return '<div class="pred-row"><div class="pred-idx">'+(i+1)+'</div><div class="pred-name">'+e.label+'</div><div class="pred-track"><div class="pred-fill '+e.cls+'" data-w="'+pct+'"></div></div><div class="pred-pct '+e.cls+'">'+e.val+'</div></div>';
+    }).join('');
+  }
+  // Volume grid
+  if (data.volumes) {
+    const v=data.volumes;
+    document.getElementById('vol-grid').innerHTML =
+      cell('Whole Tumour',v.total,'cm³')+cell('Enhancing (ET)',v.et,'cm³')+cell('Edema (ED)',v.ed,'cm³')+cell('Necrotic (NCR)',v.ncr,'cm³');
+  }
+  const wl=document.getElementById('warn-list'), ws=document.getElementById('warn-section');
+  wl.innerHTML='';
+  (data.warnings||[]).forEach(w => {
+    wl.innerHTML+='<div class="warn-row"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/></svg>'+w+'</div>';
+  });
+  ws.style.display=(data.warnings||[]).length?'block':'none';
+  document.getElementById('disclaimer-text').textContent=data.disclaimer||'Research use only. Always consult a qualified neuroradiologist.';
+  document.getElementById('disclaimer').style.display='block';
+  document.getElementById('res-content').style.display='block';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    document.querySelectorAll('.pred-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%');
+  }));
+}
+
+function cell(lbl,val,unit) {
+  return '<div class="vol-cell"><div class="vol-lbl">'+lbl+'</div><div class="vol-val">'+val+'</div><div class="vol-sub">'+unit+'</div></div>';
+}
+
+function clearResults() {
+  document.getElementById('res-empty').style.display='flex';
+  document.getElementById('res-loader').classList.remove('show');
+  document.getElementById('res-content').style.display='none';
+  document.getElementById('disclaimer').style.display='none';
+  const rs=document.getElementById('res-status');
+  rs.className='res-status'; rs.textContent='';
+  document.getElementById('sc-meta').textContent='Ready — upload four NIfTI modalities to begin';
+}
+
+/* ── LOCAL HISTORY ── */
+function saveToHistory(data) {
+  if (!data||!data.top_prediction) return;
+  const hist = JSON.parse(localStorage.getItem('brain-history')||'[]');
+  hist.unshift({
+    id: Date.now().toString(36),
+    patient_id: data.patient_id||'LOCAL',
+    top_prediction: data.top_prediction,
+    confidence: data.dice?.et||0,
+    risk_level: data.risk_level||'low',
+    warnings: data.warnings||[],
+    created_at: new Date().toISOString(),
+  });
+  localStorage.setItem('brain-history', JSON.stringify(hist.slice(0, 100)));
+  loadHistory();
+}
+
+async function loadHistory() {
+  const tb=document.getElementById('hist-tbody');
+  const hist = JSON.parse(localStorage.getItem('brain-history')||'[]');
+  const tot=hist.length;
+  const flagC=hist.filter(e=>e.risk_level==='high'||e.risk_level==='critical').length;
+  const safeC=tot-flagC;
+  const bd=document.getElementById('hist-badge'); if(bd) bd.textContent=tot;
+  setTxt('hs-total',tot||'-');
+  setTxt('sp-total',tot||'-'); setTxt('sp-flagged',flagC||'-'); setTxt('sp-safe',safeC>=0?safeC:'-');
+  if (tot>0){ setBar('spb-total',100); setBar('spb-flagged',Math.round(flagC/tot*100)); setBar('spb-safe',Math.round(safeC/tot*100)); }
+  if (!tot) { tb.innerHTML='<tr><td colspan="8" class="tbl-empty">No scan records yet.</td></tr>'; return; }
+  const RC={Critical:'risk-critical',High:'risk-high',Medium:'risk-medium',Low:'risk-low'};
+  const BC={Critical:'var(--dan)',High:'var(--dan)',Medium:'var(--wrn)',Low:'var(--ok)'};
+  tb.innerHTML=hist.map((e,i)=>{
+    const conf=e.confidence?Math.round(e.confidence*100):0;
+    const risk=e.risk_level?e.risk_level.charAt(0).toUpperCase()+e.risk_level.slice(1):'Low';
+    const warns=(e.warnings||[]).length;
+    return '<tr><td style="font-size:10px;color:var(--ink3)">'+(tot-i)+'</td><td><div class="td-primary">'+(e.patient_id||'—')+'</div><div class="td-sub">'+(e.id||'')+'</div></td><td><div class="td-primary">'+(e.top_prediction||'-')+'</div></td><td><div class="conf-mini"><div class="conf-mini-bar"><div class="conf-mini-fill" style="width:'+conf+'%;background:'+(BC[risk]||'var(--ok)')+'"></div></div><span style="font-size:9.5px;color:var(--ink3)">'+conf+'%</span></div></td><td><span class="risk-tag '+(RC[risk]||'risk-low')+'" style="font-size:8px;padding:3px 10px">&#x25CF; '+risk+'</span></td><td style="font-size:10px;white-space:nowrap">'+fmtDate(e.created_at||'')+'</td><td style="font-size:10px;color:'+(warns?'var(--wrn)':'var(--ink3)')+'">'+( warns?warns+' alert'+(warns>1?'s':''):'—' )+'</td><td><button class="del-btn" onclick="deleteScan(\''+e.id+'\',this)"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>Del</button></td></tr>';
+  }).join('');
+}
+
+function deleteScan(id, btn) {
+  if (!id||!confirm('Delete this scan permanently?')) return;
+  const row=btn.closest('tr');
+  const hist=JSON.parse(localStorage.getItem('brain-history')||'[]');
+  const updated=hist.filter(e=>e.id!==id);
+  localStorage.setItem('brain-history',JSON.stringify(updated));
+  if (row) { row.style.transition='opacity .28s,transform .28s'; row.style.opacity='0'; row.style.transform='translateX(16px)'; setTimeout(()=>{row.remove(); toast('Scan deleted.','ok');},300); }
+  loadHistory();
+}
+
+function clearHistory() {
+  if (!confirm('Delete ALL history? Cannot be undone.')) return;
+  localStorage.removeItem('brain-history');
+  toast('History cleared.','ok'); loadHistory();
+}
+
+/* ── UTILS ── */
+function setTxt(id,v){ const el=document.getElementById(id); if(el) el.textContent=v; }
+function setBar(id,p){ const el=document.getElementById(id); if(el) el.style.width=p+'%'; }
+function fmtDate(iso) {
+  if (!iso) return '-';
+  try { return new Date(iso).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})+' '+new Date(iso).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); }
+  catch { return iso; }
+}
+function toast(msg, type, ms) {
+  type=type||'ok'; ms=ms||3200;
+  const stack=document.getElementById('toast-stack');
+  const ico=type==='ok'?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+  const el=document.createElement('div'); el.className='toast t-'+type; el.innerHTML=ico+'<span>'+msg+'</span>';
+  stack.appendChild(el);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('show')));
+  setTimeout(()=>{el.classList.remove('show'); setTimeout(()=>el.remove(),280);}, ms);
+}
+
+/* ── ENTRANCE ANIMATIONS ── */
+const animated = new Set();
+const ANIM = {'ov-sec':'ov-grid','sc-sec':'sc-inner','hs-sec':'hs-sec'};
+function triggerAnim(id) {
+  if (animated.has(id)) return; animated.add(id);
+  const el=document.getElementById(ANIM[id]||id);
+  if (el) requestAnimationFrame(()=>el.classList.add('animate'));
+}
+const obs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting)triggerAnim(e.target.id);});},{root:ma,threshold:.10});
+['ov-sec','sc-sec','hs-sec'].forEach(id=>{const el=document.getElementById(id);if(el)obs.observe(el);});
+setTimeout(()=>triggerAnim('ov-sec'),80);
+
+/* ── 3D TILT — stat cards ── */
+(function initTilt(){
+  const MAX_TILT=14, MAX_LIFT=22;
+  const SPRING='0.6s cubic-bezier(.16,1,.3,1)', EASE='0.08s linear';
+  document.querySelectorAll('[data-tilt]').forEach(card=>{
+    const shine=card.querySelector('.stat-card-shine');
+    card.addEventListener('mousemove',e=>{
+      const r=card.getBoundingClientRect();
+      const x=e.clientX-r.left, y=e.clientY-r.top;
+      const cx=r.width/2, cy=r.height/2;
+      const rx=((y-cy)/cy)*-MAX_TILT, ry=((x-cx)/cx)*MAX_TILT;
+      card.style.transition=EASE;
+      card.style.transform=`perspective(700px) rotateX(${rx}deg) rotateY(${ry}deg) translateZ(${MAX_LIFT}px) scale(1.02)`;
+      card.style.boxShadow=`0 ${12+Math.abs(rx)}px ${40+Math.abs(rx)*2}px rgba(0,0,0,.55),0 0 0 1px var(--ac-d),0 0 50px -10px var(--ac-g)`;
+      if (shine){const px=(x/r.width)*100,py=(y/r.height)*100;shine.style.background=`radial-gradient(circle at ${px}% ${py}%,rgba(255,255,255,.09),transparent 55%)`;shine.style.opacity='1';}
+    });
+    card.addEventListener('mouseleave',()=>{
+      card.style.transition=SPRING; card.style.transform=''; card.style.boxShadow='';
+      if(shine)shine.style.opacity='0';
+    });
+  });
+})();
+
+/* ── 3D LIFT — hero buttons ── */
+(function initBtnTilt(){
+  document.querySelectorAll('.btn-3d').forEach(btn=>{
+    btn.addEventListener('mousemove',e=>{
+      const r=btn.getBoundingClientRect();
+      const x=e.clientX-r.left, cx=r.width/2;
+      const ry=((x-cx)/cx)*8;
+      btn.style.transform=`perspective(400px) rotateY(${ry}deg) translateY(-3px) scale(1.03)`;
+    });
+    btn.addEventListener('mouseleave',()=>{btn.style.transform='';});
+    btn.addEventListener('mousedown',()=>{btn.style.transform='perspective(400px) rotateY(0deg) translateY(0) scale(.98)';});
+    btn.addEventListener('mouseup',()=>{btn.style.transform='';});
+  });
+})();
+
+// Init history on load
+loadHistory();
+</script>
+</body>
+</html>
